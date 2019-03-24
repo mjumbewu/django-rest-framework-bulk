@@ -68,6 +68,7 @@ class BulkUpdateModelMixin(object):
 
     def bulk_update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
+        force_update = kwargs.pop('force_update', False)
 
         # restrict the update to the filtered queryset
         serializer = self.get_serializer(self.filter_queryset(self.get_queryset()),
@@ -83,7 +84,16 @@ class BulkUpdateModelMixin(object):
                 # full_clean on model instances may be called in pre_save
                 # so we have to handle eventual errors.
                 return Response(err.message_dict, status=status.HTTP_400_BAD_REQUEST)
-            self.object = serializer.save(force_update=True)
+
+            # TODO: In order for the following to be able to create objects as
+            #       well as update them the serializer needs to be constructed
+            #       with allow_add_remove set to True. This requires us to
+            #       override get_queryset, but isn't behavior to have all the
+            #       time.
+            self.object = serializer.save(force_update=force_update)
+
+            # TODO: Not all objects will have been created. Can we determine
+            #       which were?
             for obj in self.object:
                 self.post_save(obj, created=False)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -92,6 +102,7 @@ class BulkUpdateModelMixin(object):
 
     def partial_bulk_update(self, request, *args, **kwargs):
         kwargs['partial'] = True
+        kwargs['force_update'] = True
         return self.bulk_update(request, *args, **kwargs)
 
 
